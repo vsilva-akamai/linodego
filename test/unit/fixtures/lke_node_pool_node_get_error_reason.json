@@ -1,0 +1,6 @@
+{
+  "id": "12345-abcde",
+  "instance_id": 0,
+  "status": "not_ready",
+  "error_reason": "plan_type_unavailable"
+}

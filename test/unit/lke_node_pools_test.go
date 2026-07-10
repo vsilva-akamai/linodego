@@ -55,6 +55,31 @@ func TestLKENodePoolNode_Get(t *testing.T) {
 	assert.Equal(t, "12345-abcde", node.ID)
 	assert.Equal(t, 123456, node.InstanceID)
 	assert.Equal(t, linodego.LKELinodeStatus("ready"), node.Status)
+	assert.Empty(t, node.ErrorReason)
+}
+
+func TestLKENodePoolNode_Get_ErrorReason(t *testing.T) {
+	fixtures := NewTestFixtures()
+
+	fixtureData, err := fixtures.GetFixture("lke_node_pool_node_get_error_reason")
+	if err != nil {
+		t.Fatalf("Failed to load fixture: %v", err)
+	}
+
+	var base ClientBaseCase
+	base.SetUp(t)
+	defer base.TearDown(t)
+
+	base.MockGet("lke/clusters/1234/nodes/12345-abcde", fixtureData)
+
+	node, err := base.Client.GetLKENodePoolNode(context.Background(), 1234, "12345-abcde")
+	if err != nil {
+		t.Fatalf("Error getting LKE node pool node: %v", err)
+	}
+
+	assert.Equal(t, "12345-abcde", node.ID)
+	assert.Equal(t, linodego.LKELinodeNotReady, node.Status)
+	assert.Equal(t, linodego.LKELinodeErrorReasonPlanTypeUnavailable, node.ErrorReason)
 }
 
 func TestLKENodePool_Get(t *testing.T) {

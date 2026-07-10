@@ -14,6 +14,19 @@ const (
 	LKELinodeNotReady LKELinodeStatus = "not_ready"
 )
 
+// LKELinodeErrorReason constants start with LKELinodeErrorReason and describe a
+// terminal, autoscaler-actionable reason a node could not be provisioned. The
+// set is a closed but extensible enum: an empty value means there is no
+// autoscaler-actionable problem.
+type LKELinodeErrorReason string
+
+// LKELinodeErrorReason constants enumerate the recognized node error reasons.
+const (
+	// LKELinodeErrorReasonPlanTypeUnavailable indicates the requested plan type
+	// has no capacity in the cluster's region, so the node pool cannot scale up.
+	LKELinodeErrorReasonPlanTypeUnavailable LKELinodeErrorReason = "plan_type_unavailable"
+)
+
 // LKENodePoolUpdateStrategy constants start with LKENodePool and include
 // LKE Node Pool upgrade strategy values
 type LKENodePoolUpdateStrategy string
@@ -41,6 +54,11 @@ type LKENodePoolLinode struct {
 	ID         string          `json:"id"`
 	InstanceID int             `json:"instance_id"`
 	Status     LKELinodeStatus `json:"status"`
+
+	// ErrorReason surfaces a terminal, autoscaler-actionable reason the node
+	// could not be provisioned (e.g. no regional capacity for the plan type).
+	// It is additive and omitted when there is no such condition.
+	ErrorReason LKELinodeErrorReason `json:"error_reason,omitempty"`
 }
 
 // LKENodePoolTaintEffect represents the effect value of a taint
