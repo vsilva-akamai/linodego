@@ -1,0 +1,14 @@
+{
+    "id": 127,
+    "label": "test-enterprise-cluster-no-additions",
+    "region": "us-lax",
+    "status": "ready",
+    "k8s_version": "v1.31.8+lke1",
+    "tier": "enterprise",
+    "stack_type": "ipv4",
+    "additional_ipv4_ranges": null,
+    "control_plane": {
+        "high_availability": true,
+        "audit_logs_enabled": false
+    }
+}

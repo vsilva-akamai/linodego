@@ -1,0 +1,21 @@
+{
+    "id": 126,
+    "label": "new-enterprise-cluster",
+    "region": "us-lax",
+    "status": "ready",
+    "k8s_version": "v1.31.8+lke1",
+    "tier": "enterprise",
+    "stack_type": "ipv4",
+    "additional_ipv4_ranges": [
+        {
+            "range": "7.0.0.0/8"
+        },
+        {
+            "range": "9.0.0.0/8"
+        }
+    ],
+    "control_plane": {
+        "high_availability": true,
+        "audit_logs_enabled": false
+    }
+}

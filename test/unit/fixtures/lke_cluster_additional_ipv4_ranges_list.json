@@ -1,0 +1,36 @@
+{
+    "data": [
+        {
+            "id": 126,
+            "label": "test-enterprise-cluster",
+            "region": "us-lax",
+            "status": "ready",
+            "tier": "enterprise",
+            "additional_ipv4_ranges": [
+                {
+                    "range": "7.0.0.0/8"
+                },
+                {
+                    "range": "9.0.0.0/8"
+                }
+            ]
+        },
+        {
+            "id": 127,
+            "label": "test-enterprise-cluster-no-additions",
+            "region": "us-lax",
+            "status": "ready",
+            "tier": "enterprise",
+            "additional_ipv4_ranges": null
+        },
+        {
+            "id": 128,
+            "label": "test-standard-cluster",
+            "region": "us-east",
+            "status": "ready",
+            "tier": "standard"
+        }
+    ],
+    "pages": 1,
+    "results": 3
+}

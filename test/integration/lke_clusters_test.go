@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -83,6 +84,82 @@ func TestLKECluster_Enterprise_smoke(t *testing.T) {
 	if i.Tier != "enterprise" {
 		t.Errorf("Expected a lkeCluster to have enterprise tier")
 	}
+}
+
+// TestLKECluster_Enterprise_AdditionalIPv4Ranges_smoke creates an LKE Enterprise cluster with an
+// LKE-managed VPC and an additional IPv4 range, then reads it back to confirm the request is
+// returned as submitted. The cluster response carries only the requested additions: the platform's
+// own default VPC ranges are not part of this field.
+//
+// This requires an account and region entitled to custom VPC IPv4 ranges, so it has no recorded
+// fixture and is skipped during fixture playback, and it skips rather than fails when the account
+// under test is not entitled. Record it with a suitably entitled token.
+func TestLKECluster_Enterprise_AdditionalIPv4Ranges_smoke(t *testing.T) {
+	if os.Getenv("LINODE_FIXTURE_MODE") == "play" {
+		t.Skip("Skipping additional IPv4 ranges test: requires an entitled account, no fixture is recorded")
+	}
+
+	regionClient, regionTeardown := createTestClient(t, "fixtures/TestLKECluster_Enterprise_AdditionalIPv4Ranges_regions")
+
+	regions := getRegionsWithCaps(t, regionClient, []linodego.RegionCapability{
+		linodego.CapabilityLKE,
+		linodego.CapabilityKubernetesEnterprise,
+		linodego.CapabilityVPCCustomIPv4Ranges,
+	})
+	regionTeardown()
+
+	if len(regions) == 0 {
+		t.Skip("Skipping additional IPv4 ranges test: no region with custom VPC IPv4 range support")
+	}
+
+	requestedRanges := []linodego.LKEClusterAdditionalIPv4Range{
+		{Range: "7.0.0.0/8"},
+	}
+
+	client, lkeCluster, teardown, err := setupLKECluster(t, []clusterModifier{func(createOpts *linodego.LKEClusterCreateOptions) {
+		createOpts.Label = "go-lke-test-additional-ipv4-ranges"
+		createOpts.Tier = "enterprise"
+		createOpts.Region = regions[0]
+		createOpts.K8sVersion = ""
+		// LKE must own the workload VPC for this field to be accepted, so VpcID and SubnetID
+		// are deliberately left unset.
+		createOpts.AdditionalIPv4Ranges = requestedRanges
+	}}, "fixtures/TestLKECluster_Enterprise_AdditionalIPv4Ranges_smoke")
+	defer teardown()
+	require.NoError(t, err)
+
+	// The create response already reflects the request.
+	require.Equal(t, requestedRanges, lkeCluster.AdditionalIPv4Ranges)
+
+	cluster, err := client.GetLKECluster(context.Background(), lkeCluster.ID)
+	require.NoErrorf(t, err, "Error getting lkeCluster: %v", err)
+	require.Equal(t, lkeCluster.ID, cluster.ID)
+	require.Equal(t, "enterprise", cluster.Tier)
+	require.Equal(t, requestedRanges, cluster.AdditionalIPv4Ranges)
+
+	// The same value is served by list.
+	clusters, err := client.ListLKEClusters(context.Background(), nil)
+	require.NoError(t, err)
+
+	var listed *linodego.LKECluster
+
+	for i := range clusters {
+		if clusters[i].ID == lkeCluster.ID {
+			listed = &clusters[i]
+			break
+		}
+	}
+
+	require.NotNil(t, listed, "created cluster was not returned by list")
+	require.Equal(t, requestedRanges, listed.AdditionalIPv4Ranges)
+
+	// The ranges are fixed once the cluster exists: an update that changes other fields must
+	// leave them untouched.
+	updated, err := client.UpdateLKECluster(context.Background(), lkeCluster.ID, linodego.LKEClusterUpdateOptions{
+		Label: cluster.Label + "-updated",
+	})
+	require.NoError(t, err)
+	require.Equal(t, requestedRanges, updated.AdditionalIPv4Ranges)
 }
 
 func TestLKECluster_Enterprise_BYOVPC_smoke(t *testing.T) {
