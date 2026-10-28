@@ -198,3 +198,91 @@ func ErrHasStatus(err error, code ...int) bool {
 
 	return slices.Contains(code, ec)
 }
+
+// InstanceCreateErrorReason is a well-known cause of a failed Linode instance create.
+// Values are suitable for use as Kubernetes condition or annotation reasons.
+type InstanceCreateErrorReason string
+
+const (
+	// InstanceCreateErrorInsufficientCapacity indicates that the requested plan
+	// is not currently available in the selected region.
+	InstanceCreateErrorInsufficientCapacity InstanceCreateErrorReason = "InsufficientCapacity"
+
+	// InstanceCreateErrorAccountLimitReached indicates that the account has
+	// reached its limit of active services.
+	InstanceCreateErrorAccountLimitReached InstanceCreateErrorReason = "AccountLimitReached"
+)
+
+// instanceCreateErrorMatchers lists the recognized instance create errors in precedence order.
+// An entry matches when the status is equal and the message contains any of its lowercase fragments.
+// Recognizing another error requires a separate proposal and matching consumer changes,
+// not only a new entry.
+var instanceCreateErrorMatchers = []struct {
+	status    int
+	fragments []string
+	reason    InstanceCreateErrorReason
+}{
+	{
+		status:    http.StatusForbidden,
+		fragments: []string{"not currently available in the selected region"},
+		reason:    InstanceCreateErrorInsufficientCapacity,
+	},
+	{
+		status:    http.StatusBadRequest,
+		fragments: []string{"reached a limit for the number of active services"},
+		reason:    InstanceCreateErrorAccountLimitReached,
+	},
+}
+
+// ClassifyInstanceCreateError returns the well-known reason for an error returned
+// while creating a Linode instance, for example by [Client.CreateInstance].
+// err may wrap an [Error].
+//
+// The Linode API does not return a structured error code, so classification relies
+// on the HTTP status code and the error message text. The status must match exactly
+// and the text is matched case-insensitively. When the API returns several reasons,
+// a match on any of them counts. The recognized errors, in precedence order, are:
+//
+//   - [InstanceCreateErrorInsufficientCapacity]: HTTP 403 containing
+//     "not currently available in the selected region", as in
+//     "The Linode plan you chose is not currently available in the selected region."
+//   - [InstanceCreateErrorAccountLimitReached]: HTTP 400 containing
+//     "reached a limit for the number of active services", as in
+//     "You've reached a limit for the number of active services on your account."
+//
+// ClassifyInstanceCreateError returns "" if err is nil, is not an [Error], is a
+// client-side error (a Code below 100, such as [ErrorFromError]), is transient
+// (HTTP 408, HTTP 429 or HTTP 5xx), or matches no recognized error. A change in the
+// API wording can cause a recognized error to return "".
+//
+// Callers must treat "" as "not a supported error", never as a generic failure to
+// report publicly. Classification does not change retry policy, and a recognized
+// reason does not make the error message suitable for public display.
+func ClassifyInstanceCreateError(err error) InstanceCreateErrorReason {
+	var e *Error
+	if !errors.As(err, &e) || e == nil {
+		return ""
+	}
+
+	// Codes below 100 are the client-side pseudo-codes, such as ErrorFromError.
+	if e.Code < 100 || e.Code == http.StatusRequestTimeout ||
+		e.Code == http.StatusTooManyRequests || e.Code >= http.StatusInternalServerError {
+		return ""
+	}
+
+	msg := strings.ToLower(e.Message)
+
+	for _, m := range instanceCreateErrorMatchers {
+		if e.Code != m.status {
+			continue
+		}
+
+		for _, fragment := range m.fragments {
+			if strings.Contains(msg, fragment) {
+				return m.reason
+			}
+		}
+	}
+
+	return ""
+}

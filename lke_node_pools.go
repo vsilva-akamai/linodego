@@ -74,6 +74,29 @@ type LKENodePoolIsolationCreateOptions struct {
 // LKENodePoolLabels represents Kubernetes labels to add to an LKENodePool
 type LKENodePoolLabels map[string]string
 
+// LKENodePoolProvisioningErrorCode identifies a recognized failure to create nodes in an LKENodePool.
+// Only the LKENodePoolProvisioningErrorCode constants are supported. Other values still decode
+// for compatibility, but clients must ignore them rather than treat them as a provisioning failure.
+// Supporting another code requires a change to the API contract.
+type LKENodePoolProvisioningErrorCode string
+
+const (
+	// LKENodePoolProvisioningErrorCodeInsufficientCapacity indicates that the pool's plan
+	// is not currently available in the cluster's region.
+	LKENodePoolProvisioningErrorCodeInsufficientCapacity LKENodePoolProvisioningErrorCode = "insufficient_capacity"
+
+	// LKENodePoolProvisioningErrorCodeAccountLimitReached indicates that the account has
+	// reached its limit of active services.
+	LKENodePoolProvisioningErrorCodeAccountLimitReached LKENodePoolProvisioningErrorCode = "account_limit_reached"
+)
+
+// LKENodePoolProvisioningError reports a recognized capacity or account-limit failure to create
+// nodes in an LKENodePool. Message is the API's fixed public message for Code.
+type LKENodePoolProvisioningError struct {
+	Code    LKENodePoolProvisioningErrorCode `json:"code"`
+	Message string                           `json:"message"`
+}
+
 // LKENodePool represents a LKENodePool object
 type LKENodePool struct {
 	ID      int                 `json:"id"`
@@ -101,6 +124,11 @@ type LKENodePool struct {
 
 	// NOTE: Only cannot_delete applies to LKE node pools and can only be used with v4beta.
 	Locks []LockType `json:"locks"`
+
+	// ProvisioningError reports a recognized failure to create nodes in the pool, including
+	// pools without autoscaling. It is read-only and nil when the API omits it or returns null.
+	// nil means no recognized failure is recorded, not that every provisioning problem is ruled out.
+	ProvisioningError *LKENodePoolProvisioningError `json:"provisioning_error"`
 }
 
 // LKENodePoolCreateOptions fields are those accepted by CreateLKENodePool
