@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -438,6 +439,126 @@ func TestErrHasStatusCode(t *testing.T) {
 				t.Errorf("should have matched")
 			} else if got && !tt.match {
 				t.Errorf("should not have matched")
+			}
+		})
+	}
+}
+
+func TestClassifyInstanceCreateError(t *testing.T) {
+	const (
+		capacityMsg     = "The Linode plan you chose is not currently available in the selected region. Please select another region or plan type, or contact Support for assistance."
+		accountLimitMsg = "You've reached a limit for the number of active services on your account. Please contact Support to request an increase and provide the total number of services you may need."
+	)
+
+	capacityErr := &Error{Code: http.StatusForbidden, Message: capacityMsg}
+
+	type testCase struct {
+		name string
+		err  error
+		want InstanceCreateErrorReason
+	}
+
+	tests := []testCase{
+		{
+			name: "InsufficientCapacity",
+			err:  capacityErr,
+			want: InstanceCreateErrorInsufficientCapacity,
+		},
+		{
+			name: "InsufficientCapacityDifferentCase",
+			err:  &Error{Code: http.StatusForbidden, Message: strings.ToUpper(capacityMsg)},
+			want: InstanceCreateErrorInsufficientCapacity,
+		},
+		{
+			name: "InsufficientCapacityWrapped",
+			err:  fmt.Errorf("Error creating Linode instance: %w", capacityErr),
+			want: InstanceCreateErrorInsufficientCapacity,
+		},
+		{
+			name: "AccountLimitReached",
+			err:  &Error{Code: http.StatusBadRequest, Message: accountLimitMsg},
+			want: InstanceCreateErrorAccountLimitReached,
+		},
+		{
+			name: "AccountLimitReachedMultipleReasons",
+			err:  &Error{Code: http.StatusBadRequest, Message: "[label] Label must be unique; " + accountLimitMsg},
+			want: InstanceCreateErrorAccountLimitReached,
+		},
+		{
+			name: "BothTextsWith403",
+			err:  &Error{Code: http.StatusForbidden, Message: accountLimitMsg + "; " + capacityMsg},
+			want: InstanceCreateErrorInsufficientCapacity,
+		},
+		{
+			name: "BothTextsWith400",
+			err:  &Error{Code: http.StatusBadRequest, Message: capacityMsg + "; " + accountLimitMsg},
+			want: InstanceCreateErrorAccountLimitReached,
+		},
+		{
+			name: "CapacityTextWithWrongStatus",
+			err:  &Error{Code: http.StatusBadRequest, Message: capacityMsg},
+		},
+		{
+			name: "LegacyCapacityWording",
+			err:  &Error{Code: http.StatusForbidden, Message: "The selected region does not have any availability for the requested service plan"},
+		},
+		{
+			name: "UnknownError",
+			err:  &Error{Code: http.StatusBadRequest, Message: "The region this linode is in does not support disk encryption at this time"},
+		},
+		{
+			name: "ClientSideError",
+			err:  NewError(errors.New("context deadline exceeded")),
+		},
+		{
+			name: "ContextDeadlineExceeded",
+			err:  context.DeadlineExceeded,
+		},
+		{
+			name: "WrappedURLError",
+			err: fmt.Errorf("Error creating Linode instance: %w", &url.Error{
+				Op:  http.MethodPost,
+				URL: "https://api.linode.com/v4/linode/instances",
+				Err: context.DeadlineExceeded,
+			}),
+		},
+		{
+			name: "NotALinodeError",
+			err:  errors.New("[403] " + capacityMsg),
+		},
+		{
+			name: "NilError",
+		},
+	}
+
+	for _, code := range []int{
+		http.StatusRequestTimeout,
+		http.StatusTooManyRequests,
+		http.StatusInternalServerError,
+		http.StatusNotImplemented,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusHTTPVersionNotSupported,
+		http.StatusInsufficientStorage,
+	} {
+		tests = append(tests, testCase{
+			name: "Transient" + strconv.Itoa(code),
+			err:  &Error{Code: code, Message: capacityMsg},
+		})
+	}
+
+	for _, code := range []int{ErrorUnsupported, ErrorFromString, ErrorFromError, ErrorFromStringer} {
+		tests = append(tests, testCase{
+			name: "PseudoCode" + strconv.Itoa(code),
+			err:  &Error{Code: code, Message: capacityMsg},
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ClassifyInstanceCreateError(tt.err); got != tt.want {
+				t.Errorf("ClassifyInstanceCreateError() = %q, want %q", got, tt.want)
 			}
 		})
 	}

@@ -7,7 +7,11 @@
         "locks": ["cannot_delete"],
         "tags": ["tag1"],
         "labels": {"env": "staging"},
-        "autoscaler": {"enabled": true, "min": 1, "max": 5}
+        "autoscaler": {"enabled": true, "min": 1, "max": 5},
+        "provisioning_error": {
+          "code": "account_limit_reached",
+          "message": "The account's active-services limit has been reached. Contact Support to request an increase."
+        }
       },
       {
         "id": 789,
