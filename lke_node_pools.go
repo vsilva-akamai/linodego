@@ -126,9 +126,10 @@ type LKENodePool struct {
 	Locks []LockType `json:"locks"`
 
 	// ProvisioningError reports a recognized failure to create nodes in the pool, including
-	// pools without autoscaling. It is read-only and nil when the API omits it or returns null.
+	// pools without autoscaling. It is optional and read-only: the API omits it when no
+	// recognized failure is recorded, and it is nil when absent or null.
 	// nil means no recognized failure is recorded, not that every provisioning problem is ruled out.
-	ProvisioningError *LKENodePoolProvisioningError `json:"provisioning_error"`
+	ProvisioningError *LKENodePoolProvisioningError `json:"provisioning_error,omitzero"`
 }
 
 // LKENodePoolCreateOptions fields are those accepted by CreateLKENodePool

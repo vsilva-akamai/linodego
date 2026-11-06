@@ -20,8 +20,7 @@
         "locks": [],
         "tags": ["tag2"],
         "labels": {"env": "prod"},
-        "autoscaler": {"enabled": false, "min": 0, "max": 0},
-        "provisioning_error": null
+        "autoscaler": {"enabled": false, "min": 0, "max": 0}
       }
     ],
     "pages": 1,

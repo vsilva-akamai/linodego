@@ -109,6 +109,32 @@ func TestLKENodePool_GetUnknownProvisioningErrorCode(t *testing.T) {
 	}
 }
 
+func TestLKENodePool_GetWithoutProvisioningError(t *testing.T) {
+	tests := []struct {
+		name     string
+		response map[string]any
+	}{
+		{name: "Absent", response: map[string]any{"id": 456, "count": 3}},
+		{name: "Null", response: map[string]any{"id": 456, "count": 3, "provisioning_error": nil}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var base ClientBaseCase
+			base.SetUp(t)
+			defer base.TearDown(t)
+
+			base.MockGet("lke/clusters/123/pools/456", tt.response)
+
+			nodePool, err := base.Client.GetLKENodePool(context.Background(), 123, 456)
+			assert.NoError(t, err)
+			assert.Equal(t, 456, nodePool.ID)
+			assert.Equal(t, 3, nodePool.Count)
+			assert.Nil(t, nodePool.ProvisioningError)
+		})
+	}
+}
+
 func TestLKENodePool_Create(t *testing.T) {
 	fixtureData, err := fixtures.GetFixture("lke_node_pool_create")
 	assert.NoError(t, err)
